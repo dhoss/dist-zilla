@@ -137,25 +137,20 @@ sub gather_files {
   $root = Path::Class::dir($root);
 
   my @files;
-  my $file_list = File::Next::files(
-    follow_symlinks => $self->follow_symlinks,
+  my $file_list = File::Next::files({
+      follow_symlinks => $self->follow_symlinks,
+      file_filter     => sub {
+        $self->_file_filter()
+      }
+    },
     $root
   );
-  FILE: while ( defined( my $filename =$file_list->() ) ) {
+  FILE: while ( defined( my $filename = $file_list->() ) ) {
     my $file = file($filename)->relative($root);
-
     unless ($self->include_dotfiles) {
       next FILE if $file->basename =~ qr/^\./;
       next FILE if grep { /^\.[^.]/ } $file->dir->dir_list;
     }
-
-    my $exclude_regex = qr/\000/;
-    $exclude_regex = qr/$exclude_regex|$_/
-      for ($self->exclude_match->flatten);
-    # \b\Q$_\E\b should also handle the `eq` check
-    $exclude_regex = qr/$exclude_regex|\b\Q$_\E\b/
-      for ($self->exclude_filename->flatten);
-    next if $file =~ $exclude_regex;
 
     push @files, $self->_file_from_filename($filename);
   }
@@ -181,5 +176,19 @@ sub _file_from_filename {
   });
 }
 
+sub _file_filter {
+  my ($self) = @_;
+  my $exclude_regex = qr/\000/;
+  $exclude_regex = qr/$exclude_regex|$_/
+    for ($self->exclude_match->flatten);
+  # \b\Q$_\E\b should also handle the `eq` check
+  $exclude_regex = qr/$exclude_regex|\b\Q$_\E\b/
+    for ($self->exclude_filename->flatten);
+  if ( $File::Next::name =~ $exclude_regex ||
+       $_                =~ $exclude_regex ) {
+    return 0;
+  }
+  return 1;
+}
 __PACKAGE__->meta->make_immutable;
 1;
