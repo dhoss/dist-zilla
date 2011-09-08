@@ -34,7 +34,7 @@ files into a subdir of your dist, you might write:
 
 =cut
 
-use File::Find::Rule;
+use File::Next;
 use File::HomeDir;
 use File::Spec;
 use Path::Class;
@@ -137,9 +137,11 @@ sub gather_files {
   $root = Path::Class::dir($root);
 
   my @files;
-  my $rule = File::Find::Rule->new();
-  $rule->extras({follow => $self->follow_symlinks});
-  FILE: for my $filename ($rule->file->in($root)) {
+  my $file_list = File::Next::files(
+    follow_symlinks => $self->follow_symlinks,
+    $root
+  );
+  FILE: while ( defined( my $filename =$file_list->() ) ) {
     my $file = file($filename)->relative($root);
 
     unless ($self->include_dotfiles) {
